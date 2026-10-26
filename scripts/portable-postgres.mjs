@@ -1,0 +1,21 @@
+import EmbeddedPostgres from 'embedded-postgres';
+import fs from 'node:fs/promises';
+import path from 'node:path';
+import crypto from 'node:crypto';
+const directory=path.resolve('.local');
+await fs.mkdir(directory,{recursive:true});
+const credentialsPath=path.join(directory,'postgres.json');
+let credentials;
+try{credentials=JSON.parse(await fs.readFile(credentialsPath,'utf8'));}catch{credentials={user:'motos_local',password:crypto.randomBytes(32).toString('hex'),port:55432};await fs.writeFile(credentialsPath,JSON.stringify(credentials),{mode:0o600});}
+const pg=new EmbeddedPostgres({databaseDir:path.join(directory,'postgres-data'),...credentials,persistent:true,authMethod:'scram-sha-256',postgresFlags:['-h','127.0.0.1'],onLog:()=>{},onError:message=>console.error(String(message))});
+if(!await fs.access(path.join(directory,'postgres-data','PG_VERSION')).then(()=>true).catch(()=>false)) await pg.initialise();
+await pg.start();
+const client=pg.getPgClient();await client.connect();
+for(const name of ['motos','motos_test'])if(!(await client.query('SELECT 1 FROM pg_database WHERE datname=$1',[name])).rowCount)await client.query('CREATE DATABASE '+name);
+await client.end();
+const url='postgresql://'+credentials.user+':'+credentials.password+'@127.0.0.1:'+credentials.port+'/motos?schema=public';
+if(!await fs.access('backend/.env').then(()=>true).catch(()=>false))await fs.writeFile('backend/.env','DATABASE_URL='+url+'\nJWT_SECRET='+crypto.randomBytes(48).toString('hex')+'\nAPP_ORIGIN=http://localhost:5173\nPORT=3001\nCOOKIE_SECURE=false\n');
+await fs.writeFile(path.join(directory,'test-env.json'),JSON.stringify({DATABASE_URL:url.replace('/motos?','/motos_test?'),JWT_SECRET:crypto.randomBytes(48).toString('hex'),APP_ORIGIN:'http://localhost:5173',PORT:'3001',NODE_ENV:'test',COOKIE_SECURE:'false'}));
+console.log('PostgreSQL local disponível em 127.0.0.1:'+credentials.port+'. Ambiente local configurado; banco de testes separado.');
+for(const signal of ['SIGINT','SIGTERM'])process.on(signal,async()=>{await pg.stop();process.exit(0);});
+await new Promise(()=>{});

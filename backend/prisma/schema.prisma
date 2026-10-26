@@ -1,0 +1,164 @@
+generator client {
+  provider = "prisma-client-js"
+}
+datasource db {
+  provider = "postgresql"
+  url = env("DATABASE_URL")
+}
+enum Role {
+  ADMIN
+  GERENTE
+  VENDEDOR
+}
+enum MotorcycleStatus {
+  DISPONIVEL
+  VENDIDA
+  INATIVA
+}
+enum SaleStatus {
+  ATIVA
+  CANCELADA
+}
+enum InstallmentStatus {
+  PENDENTE
+  PAGA
+  CANCELADA
+}
+model Unit {
+  id String @id @default(uuid())
+  name String
+  code String @unique
+  address String
+  city String
+  state String @db.Char(2)
+  phone String
+  active Boolean @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  users User[]
+  managers ManagerUnit[]
+  motorcycles Motorcycle[]
+  sales Sale[]
+  customers Customer[]
+}
+model User {
+  id String @id @default(uuid())
+  name String
+  email String @unique
+  phone String @default("")
+  passwordHash String
+  role Role
+  active Boolean @default(true)
+  sessionVersion Int @default(0)
+  unitId String?
+  unit Unit? @relation(fields: [unitId], references: [id], onDelete: Restrict)
+  managerUnits ManagerUnit[]
+  sales Sale[]
+  customers Customer[]
+  auditLogs AuditLog[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([unitId, role, active])
+}
+model ManagerUnit {
+  userId String
+  unitId String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  unit Unit @relation(fields: [unitId], references: [id], onDelete: Restrict)
+  @@id([userId, unitId])
+  @@index([unitId])
+}
+model Customer {
+  id String @id @default(uuid())
+  name String
+  cpf String @unique @db.Char(11)
+  phone String
+  email String?
+  zip String @db.Char(8)
+  street String
+  number String
+  complement String @default("")
+  neighborhood String
+  city String
+  state String @db.Char(2)
+  notes String @default("")
+  active Boolean @default(true)
+  unitId String
+  unit Unit @relation(fields: [unitId], references: [id], onDelete: Restrict)
+  createdById String
+  createdBy User @relation(fields: [createdById], references: [id], onDelete: Restrict)
+  sales Sale[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([unitId, name])
+  @@index([createdById])
+}
+model Motorcycle {
+  id String @id @default(uuid())
+  brand String
+  model String
+  year Int
+  color String
+  chassis String? @unique
+  price Decimal @db.Decimal(14,2)
+  unitId String
+  unit Unit @relation(fields: [unitId], references: [id], onDelete: Restrict)
+  status MotorcycleStatus @default(DISPONIVEL)
+  notes String @default("")
+  sales Sale[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([unitId, status])
+}
+model Sale {
+  id String @id @default(uuid())
+  code Int @unique @default(autoincrement())
+  customerId String
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  motorcycleId String
+  motorcycle Motorcycle @relation(fields: [motorcycleId], references: [id], onDelete: Restrict)
+  unitId String
+  unit Unit @relation(fields: [unitId], references: [id], onDelete: Restrict)
+  sellerId String
+  seller User @relation(fields: [sellerId], references: [id], onDelete: Restrict)
+  total Decimal @db.Decimal(14,2)
+  soldAt DateTime @db.Date
+  installmentCount Int
+  status SaleStatus @default(ATIVA)
+  cancellationReason String?
+  installments Installment[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([unitId, soldAt])
+  @@index([sellerId, soldAt])
+  @@index([customerId])
+}
+model Installment {
+  id String @id @default(uuid())
+  saleId String
+  sale Sale @relation(fields: [saleId], references: [id], onDelete: Restrict)
+  number Int
+  amount Decimal @db.Decimal(14,2)
+  dueAt DateTime @db.Date
+  paidAt DateTime? @db.Date
+  status InstallmentStatus @default(PENDENTE)
+  notes String @default("")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@unique([saleId, number])
+  @@index([status, dueAt])
+}
+model AuditLog {
+  id String @id @default(uuid())
+  userId String?
+  user User? @relation(fields: [userId], references: [id], onDelete: Restrict)
+  action String
+  entity String
+  recordId String?
+  before Json?
+  after Json?
+  ip String?
+  createdAt DateTime @default(now())
+  @@index([createdAt])
+  @@index([userId, action, entity])
+}

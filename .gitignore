@@ -1,0 +1,19 @@
+node_modules/
+.env
+backend/.env
+frontend/.env
+frontend/dist/
+playwright-report/
+test-results/
+.local/
+*.log
+
+# Local secrets and private exports
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.dump
+*.backup

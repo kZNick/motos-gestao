@@ -1,0 +1,17 @@
+import express from 'express';
+import helmet from 'helmet';
+import cors from 'cors';
+import cookieParser from 'cookie-parser';
+import { env } from './config/env.js';
+import { router } from './routes/index.js';
+import { errors } from './middlewares/errors.js';
+export const app=express();
+app.disable('x-powered-by');
+if(process.env.TRUST_PROXY==='1') app.set('trust proxy',1);
+app.use(helmet());
+app.use(cors({origin:env.APP_ORIGIN,credentials:true}));
+app.use(express.json({limit:'64kb'}));
+app.use(cookieParser());
+app.use('/api',router);
+app.use((req,res)=>res.status(404).json({error:{message:'Endpoint não encontrado.'}}));
+app.use(errors);
