@@ -1,0 +1,13 @@
+import { z } from 'zod';
+import { storedImagePath } from '../services/images.js';
+const text=z.string().trim().min(1).max(200);
+const notes=z.string().trim().max(2000).default('');
+const money=z.union([z.string(),z.number()]).transform(String).refine(v=>/^\d+(?:\.\d{1,2})?$/.test(v)&&Number(v)>0&&Number(v)<=999999999999.99,'Informe um valor positivo com até duas casas decimais.');
+const image=z.union([z.string().trim().url().max(2000).refine(v=>/^https?:\/\//i.test(v),'Use HTTP ou HTTPS.'),z.string().regex(/^\/images\/[A-Za-z0-9._-]+$/),z.string().regex(storedImagePath),z.literal('')]).optional().transform(v=>v||null);
+const options=z.array(text).max(100).default([]).transform(xs=>[...new Set(xs)]);
+export const product=z.object({name:text,brand:text,model:text,description:notes,imageUrl:image,basePrice:money,unitId:z.string().uuid(),colors:options,batteryTypes:options,versions:options,active:z.boolean().default(true)}).strict();
+const swatch=z.object({name:z.string().trim().min(1).max(30),hex:z.string().regex(/^#[0-9a-fA-F]{6}$/,'Escolha uma cor válida.').transform(v=>v.toUpperCase())}).strict();
+export const variant=z.object({version:text,batteryType:text,color:text,colorSwatches:z.array(swatch).min(1).max(6).optional(),price:money.nullable().optional().default(null),imageUrl:image,active:z.boolean().default(true)}).strict().superRefine((v,ctx)=>{if(v.colorSwatches){const keys=v.colorSwatches.map(c=>c.name.toLocaleLowerCase('pt-BR'));if(new Set(keys).size!==keys.length)ctx.addIssue({code:'custom',path:['colorSwatches'],message:'Use nomes diferentes para as cores da combinação.'});}}).transform(v=>v.colorSwatches?{...v,colorSwatches:[...v.colorSwatches].sort((a,b)=>a.name.localeCompare(b.name,'pt-BR')),color:[...v.colorSwatches].sort((a,b)=>a.name.localeCompare(b.name,'pt-BR')).map(c=>c.name).join(' / ')}:v);
+export const receipt=z.object({quantity:z.coerce.number().int().min(1).max(500),year:z.coerce.number().int().min(1900).max(2100),code:z.string().trim().max(100).default(''),unitCost:money.nullable().optional().default(null),salePrice:money.nullable().optional().default(null),notes}).strict();
+export const adjustment=z.object({quantity:z.coerce.number().int().min(1).max(500),reason:z.string().trim().min(5).max(2000)}).strict();
+export const price=z.object({price:money,variantId:z.string().uuid().nullable().default(null),reason:z.string().trim().min(5).max(2000)}).strict();

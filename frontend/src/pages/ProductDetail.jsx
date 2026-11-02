@@ -1,0 +1,33 @@
+import { useState } from 'react';
+import { useParams,Link } from 'react-router-dom';
+import { useQuery,useMutation,useQueryClient } from '@tanstack/react-query';
+import { ArrowLeft,Pencil,TrendingUp } from 'lucide-react';
+import { api,errorMessage } from '../api.js';
+import { Loading,ErrorBox,Modal,Table,money,date } from '../components/ui.jsx';
+import '../inventory.css';
+import { VariantSelector } from '../components/VariantSelector.jsx';
+import { MotorcyclePhoto } from '../components/MotorcyclePhoto.jsx';
+import { ProductForm,VariantForm,ReceiptForm,PriceForm,WithdrawForm } from '../components/InventoryForms.jsx';
+const variantName=v=>v?[v.color,v.batteryType,v.version].join(' · '):'Todo o produto';
+const kindName={ENTRADA:'Entrada de lote',VENDA:'Venda',CANCELAMENTO:'Cancelamento de venda',SAIDA_MANUAL:'Saída manual'};
+export function ProductDetail({user,notify}) {
+ const {id}=useParams(),qc=useQueryClient(),[action,setAction]=useState(null),[tab,setTab]=useState('stock'),[selectedId,setSelectedId]=useState('');
+ const canManage=user.role!=='VENDEDOR';
+ const query=useQuery({queryKey:['product',id],queryFn:async()=>(await api.get('/products/'+id)).data.data});
+ const command=useMutation({mutationFn:data=>{
+  if(action.type==='product')return api.put('/products/'+id,data);
+  if(action.type==='variant')return action.variant?api.put('/products/'+id+'/variants/'+action.variant.id,data):api.post('/products/'+id+'/variants',data);
+  if(action.type==='price')return api.post('/products/'+id+'/price',data);
+  return api.post('/variants/'+action.variant.id+'/'+action.type,data);
+ },onSuccess:()=>{qc.invalidateQueries();setAction(null);notify('Alteração registrada com sucesso.');}});
+ const open=a=>{command.reset();setAction(a);};
+ if(query.isPending)return <Loading/>;
+ if(query.isError)return <ErrorBox error={errorMessage(query.error)}/>;
+ const p=query.data,stock=p.variants.reduce((n,v)=>n+v.stock,0);
+ const selected=p.variants.find(v=>v.id===selectedId)||p.variants[0];
+ const photoUrl=selected?.imageUrl||p.imageUrl;
+ const specificPhoto=!!photoUrl&&photoUrl!==p.imageUrl;
+ const modalTitles={product:'Editar produto',variant:action?.variant?'Editar configuração':'Adicionar cor e configuração',price:'Alterar preço',receive:'Entrada de lote',withdraw:'Saída de estoque'};
+ const formProps={pending:command.isPending,error:command.isError?errorMessage(command.error):null,onSubmit:data=>command.mutate(data)};
+ return <><Link to="/motorcycles" className="back-link"><ArrowLeft size={17}/>Voltar às motos</Link><div className="page-heading"><div><span className="eyebrow">{p.unit.name} · {p.active?'PRODUTO ATIVO':'PRODUTO INATIVO'}</span><h1>{p.name}</h1><p>Escolha a cor e a configuração da sua moto.</p></div>{canManage&&<div className="heading-actions"><button className="secondary" onClick={()=>open({type:'product'})}><Pencil size={16}/>Editar produto</button><button className="primary" onClick={()=>open({type:'price'})}><TrendingUp size={17}/>Alterar preço</button></div>}</div><div className="product-overview"><div className="panel product-cover"><MotorcyclePhoto key={photoUrl||p.id} url={photoUrl} name={p.name} large/><small>{specificPhoto?'Foto da configuração: '+variantName(selected):'Imagem de referência do modelo. Confira a cor na variação.'}</small></div><div className="panel product-summary"><h2>{p.brand} · {p.model}</h2><p>Selecione a cor, a bateria e a versão para consultar o estoque.</p><div className="product-summary-numbers"><div><small>Preço padrão</small><strong>{money(p.basePrice)}</strong></div><div><small>Disponíveis</small><strong>{stock}</strong></div><div><small>Cores</small><strong>{new Set(p.variants.map(v=>v.color.toLocaleLowerCase('pt-BR'))).size}</strong></div></div>{canManage&&<p className="callout">Preço errado, aumento ou redução? Use Alterar preço. O custo de compra fica registrado em cada lote.</p>}</div></div><div className="panel"><div className="inventory-tabs" role="tablist" aria-label="Dados do produto">{[['stock','Variações e estoque'],['movements','Movimentações'],...(canManage?[['batches','Lotes recebidos'],['prices','Histórico de preços']]:[])].map(([value,label])=><button type="button" role="tab" aria-selected={tab===value} className={tab===value?'active':''} key={value} onClick={()=>setTab(value)}>{label}</button>)}</div>{tab==='stock'&&<VariantSelector product={p} selected={selected} onSelect={setSelectedId} canManage={canManage} onAction={open}/>}{tab==='movements'&&<><div className="panel-title"><p>Últimas 100 movimentações. Vendas baixam uma unidade; cancelamentos devolvem ao estoque.</p></div><Table rows={p.movements} columns={[{key:'createdAt',label:'Data',render:r=>date(r.createdAt)},{key:'variant',label:'Variação',render:r=>variantName(r.variant)},{key:'kind',label:'Movimento',render:r=>kindName[r.kind]||r.kind},{key:'quantity',label:'Quantidade',render:r=><strong>{r.quantity>0?'+':''}{r.quantity}</strong>},{key:'reason',label:'Motivo'},{key:'user',label:'Responsável',render:r=>r.user?.name||'Sistema'}]}/></>}{tab==='batches'&&canManage&&<><div className="panel-title"><p>Últimos 100 lotes, com custo separado do preço de venda.</p></div><Table rows={p.batches} columns={[{key:'code',label:'Lote'},{key:'createdAt',label:'Recebido em',render:r=>date(r.createdAt)},{key:'variant',label:'Variação',render:r=>variantName(r.variant)},{key:'quantity',label:'Recebidas',render:r=>r.quantity},{key:'remaining',label:'Disponíveis',render:r=>r._count.motorcycles},{key:'unitCost',label:'Custo por moto',render:r=>r.unitCost?money(r.unitCost):'Não informado'},{key:'notes',label:'Observações'}]}/></>}{tab==='prices'&&canManage&&<><div className="panel-title"><p>Últimos 100 registros de preço. As vendas já realizadas mantêm os valores originais.</p></div><Table rows={p.priceChanges} columns={[{key:'createdAt',label:'Data',render:r=>date(r.createdAt)},{key:'variant',label:'Aplicação',render:r=>variantName(r.variant)},{key:'oldPrice',label:'De',render:r=>money(r.oldPrice)},{key:'newPrice',label:'Para',render:r=>money(r.newPrice)},{key:'reason',label:'Motivo'},{key:'user',label:'Responsável',render:r=>r.user?.name||'Sistema'}]}/></>}</div>{action&&<Modal title={modalTitles[action.type]} onClose={()=>!command.isPending&&setAction(null)}>{action.type==='product'?<ProductForm initial={p} user={user} {...formProps}/>:action.type==='variant'?<VariantForm product={p} initial={action.variant} {...formProps}/>:action.type==='price'?<PriceForm product={p} variant={action.variant} {...formProps}/>:action.type==='receive'?<ReceiptForm variant={action.variant} {...formProps}/>:<WithdrawForm variant={action.variant} {...formProps}/>}</Modal>}</>;
+}

@@ -2,11 +2,12 @@ import '../src/config/env.js';
 import { db } from '../src/config/db.js';
 import bcrypt from 'bcrypt';
 import { z } from 'zod';
+import { password as passwordPolicy,username as usernamePolicy } from '../src/schemas/index.js';
 import { audit } from '../src/services/audit.js';
 import { createInterface } from 'node:readline/promises';
 async function hiddenPassword() {
  if(!process.stdin.isTTY)throw new Error('Em execução não interativa, defina ADMIN_PASSWORD no ambiente.');
- process.stdout.write('Senha (mínimo 10 caracteres; entrada oculta): ');
+ process.stdout.write('Senha (8 caracteres, uma maiúscula e um especial; entrada oculta): ');
  process.stdin.setRawMode(true);process.stdin.resume();
  return new Promise((resolve,reject)=>{
   let value='';
@@ -28,12 +29,12 @@ try {
  const email=(process.env.ADMIN_EMAIL || await input.question('E-mail: ')).toLowerCase();
  input.close();
  const password=process.env.ADMIN_PASSWORD || await hiddenPassword();
- z.object({name:z.string().min(2),email:z.string().email(),password:z.string().min(10).max(72).refine(v=>Buffer.byteLength(v)<=72)}).parse({name,email,password});
+ z.object({name:z.string().min(2),email:z.string().email(),password:passwordPolicy}).parse({name,email,password});
  const passwordHash=await bcrypt.hash(password,12);
  await db.$transaction(async tx=>{
   await tx.$executeRaw`SELECT pg_advisory_xact_lock(918273)`;
   if(await tx.user.count({where:{role:'ADMIN',active:true}})) throw new Error('Já existe administrador ativo. Use a interface para criar outros funcionários.');
-  const user=await tx.user.create({data:{name,email,passwordHash,role:'ADMIN'}});
+  const user=await tx.user.create({data:{name,email,username:process.env.ADMIN_USERNAME?usernamePolicy.parse(process.env.ADMIN_USERNAME):null,passwordHash,role:'ADMIN'}});
   await audit(tx,{ip:null},'BOOTSTRAP','User',user.id,null,{name,email,role:'ADMIN'});
  });
  console.log('Administrador criado.');

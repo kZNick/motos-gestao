@@ -1,3 +1,4 @@
+import { calculateFinancing } from '../../shared/financing.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { validCpf,moneyCents,splitInstallments,decimal,dateOnly,effectiveStatus } from '../src/lib/business.js';
@@ -21,4 +22,14 @@ test('Atraso é calculado pela data e não altera parcelas pagas/canceladas',()=
 });
 test('Auditoria remove segredos inclusive em objetos aninhados',()=>{
  assert.deepEqual(redact({password:'secret',user:{passwordHash:'secret',token:'secret',name:'Maria'},csrfToken:'secret'}),{user:{name:'Maria'}});
+});
+
+
+test('Juros sobre o total e valor de parcela com centavos exatos',()=>{
+ assert.equal(calculateFinancing('9999.90',12,'PERCENT','10').total,'10999.89');
+ assert.equal(calculateFinancing('9999.90',12,'AMOUNT','600').total,'10599.90');
+ const manual=calculateFinancing('9999.90',12,'INSTALLMENT','900');assert.equal(manual.total,'10800.00');assert.equal(manual.interestAmount,'800.10');assert.equal(manual.installmentAmount,'900.00');
+ assert.equal(calculateFinancing('100',3).higherInstallments,1);assert.equal(calculateFinancing('0.05',2,'PERCENT','10').interestAmount,'0.01');
+ for(let count=2;count<=120;count++)for(const mode of ['NONE','AMOUNT','PERCENT']){const a=calculateFinancing('12345.67',count,mode,'7.35');const rows=splitInstallments(a.total,count,'2026-01-01');assert.equal(rows.reduce((n,r)=>n+moneyCents(r.amount),0n),moneyCents(a.total));}
+ assert.throws(()=>calculateFinancing('100',12,'INSTALLMENT','1'));assert.throws(()=>calculateFinancing('100',1,'PERCENT','10'));assert.throws(()=>calculateFinancing('100',2,'AMOUNT','-1'));assert.throws(()=>calculateFinancing('100',2,'PERCENT','1.234'));assert.throws(()=>calculateFinancing('999999999999.99',2,'AMOUNT','0.01'));
 });

@@ -1,0 +1,117 @@
+/* Shared modal finish, including every internally scrolling form. */
+.modal-backdrop {
+  padding: 32px;
+  background: rgb(18 40 31 / 42%);
+  backdrop-filter: blur(5px);
+}
+.modal.modal {
+  padding: 26px 28px 22px;
+  border: 1px solid rgb(255 255 255 / 75%);
+  border-radius: 20px;
+  max-height: calc(100dvh - 64px);
+  box-shadow: 0 24px 80px rgb(15 36 25 / 20%), 0 4px 16px rgb(15 36 25 / 8%);
+}
+.modal.modal > header {
+  align-items: center;
+  gap: 20px;
+  margin-bottom: 20px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid #e9eee8;
+}
+.modal.modal > header h2 {
+  font-size: 18px;
+  letter-spacing: -.35px;
+  color: #203e30;
+}
+.modal.modal > header .icon-button {
+  width: 36px;
+  height: 36px;
+  border: 1px solid #e8eee6;
+  border-radius: 11px;
+  background: #f6f8f4;
+  color: #6b8170;
+  align-self: center;
+}
+.modal.modal > header .icon-button:hover {
+  background: #eaf2e7;
+  color: #245c3d;
+  border-color: #cddfc9;
+}
+.modal.modal > header .icon-button svg { width: 19px; height: 19px; }
+
+.modal .modal-content,
+.modal .modal-form-fields,
+.modal .sale-fields {
+  scrollbar-width: thin;
+  scrollbar-color: #a4bba9 #f1f5ef;
+  scrollbar-gutter: stable;
+  overscroll-behavior: contain;
+}
+.modal .modal-content form > .modal-form-fields,
+.modal .sale-simple > .sale-fields {
+  padding: 4px 12px 18px 2px;
+  scroll-padding-block: 16px;
+}
+/* Chromium/WebKit: no arrows, a rounded thumb and a quiet inset track. */
+@supports selector(::-webkit-scrollbar) {
+  .modal .modal-content,
+  .modal .modal-form-fields,
+  .modal .sale-fields { scrollbar-width: auto; scrollbar-color: auto; }
+  .modal ::-webkit-scrollbar { width: 8px; height: 8px; }
+  .modal ::-webkit-scrollbar-track { background: #f1f5ef; border-radius: 12px; }
+  .modal ::-webkit-scrollbar-thumb {
+    background: #a4bba9;
+    border: 2px solid #f1f5ef;
+    border-radius: 12px;
+    min-height: 40px;
+  }
+  .modal ::-webkit-scrollbar-thumb:hover { background: #6e957b; }
+  .modal ::-webkit-scrollbar-button { display: none; width: 0; height: 0; }
+  .modal ::-webkit-scrollbar-corner { background: transparent; }
+}
+.modal.modal input:not([type=checkbox]):not([type=radio]):not([type=color]):not([type=file]),
+.modal.modal select,
+.modal.modal textarea {
+  border-radius: 10px;
+  border-color: #dce6d9;
+  background-color: #fcfdfb;
+}
+.modal.modal input:focus,
+.modal.modal select:focus,
+.modal.modal textarea:focus { background-color: #fff; }
+.modal input[type=checkbox] { accent-color: #275e42; }
+.modal .form-grid > label.check {
+  grid-column: 1 / -1;
+  justify-self: start;
+  padding: 8px 12px;
+  min-height: 40px;
+  border: 1px solid #e7ede2;
+  border-radius: 10px;
+  background: #f6f9f2;
+}
+.modal.modal .modal-content form > footer {
+  border-top-color: #e7ede3;
+  padding-top: 18px;
+}
+.modal.modal form > footer .primary {
+  min-height: 44px;
+  border-radius: 10px;
+  padding-inline: 20px;
+}
+@media (max-width: 650px) {
+  .modal-backdrop { padding: 12px; }
+  .modal.modal {
+    padding: 18px 18px 16px;
+    border-radius: 17px;
+    max-height: calc(100dvh - 24px);
+  }
+  .modal.modal > header { margin-bottom: 16px; padding-bottom: 14px; gap: 12px; }
+  .modal.modal > header h2 { font-size: 16px; }
+  .modal .modal-content form > .modal-form-fields,
+  .modal .sale-simple > .sale-fields { padding-right: 9px; }
+}
+@media (forced-colors: active) {
+  .modal .modal-content,
+  .modal .modal-form-fields,
+  .modal .sale-fields { scrollbar-color: auto; }
+}

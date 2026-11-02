@@ -3,11 +3,18 @@ import crypto from 'node:crypto';
 test('Fluxo completo da interface com PostgreSQL',async({page})=>{
  test.skip(!process.env.E2E_PASSWORD,'Execute pelo script test:local -- --e2e.');
  const suffix=crypto.randomBytes(4).toString('hex');
+ await page.route('https://images.example.test/moto.png',route=>route.fulfill({contentType:'image/png',body:Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jO1sAAAAASUVORK5CYII=','base64')}));
  await page.goto('/');
- await page.getByLabel('E-mail',{exact:true}).fill(process.env.E2E_EMAIL);
+ await page.getByLabel('E-mail ou nome de usuário',{exact:true}).fill(process.env.E2E_EMAIL);
  await page.getByLabel('Senha',{exact:true}).fill(process.env.E2E_PASSWORD);
+ await page.getByRole('button',{name:'Mostrar senha',exact:true}).click();await expect(page.getByLabel('Senha',{exact:true})).toHaveAttribute('type','text');
+ await page.getByLabel('Manter conectado por 30 dias').check();
  await page.getByRole('button',{name:'Entrar no sistema'}).click();
+ await expect(page.getByRole('heading',{name:'Escolha uma unidade'})).toBeVisible();
+ const cookie=(await page.context().cookies()).find(c=>c.name==='session');expect(cookie.httpOnly).toBe(true);expect(cookie.expires).toBeGreaterThan(Date.now()/1000+29*86400);
+ await page.getByRole('button',{name:/Todas as unidades/}).click();
  await expect(page.getByRole('heading',{name:'Olá, Equipe.'})).toBeVisible();
+ await page.reload();await expect(page.getByRole('heading',{name:'Olá, Equipe.'})).toBeVisible();
  await page.getByRole('link',{name:'Unidades',exact:true}).click();
  await page.getByRole('button',{name:'Cadastrar unidade'}).click();
  await page.getByLabel('Nome da unidade').fill('Loja navegador '+suffix);
@@ -19,11 +26,13 @@ test('Fluxo completo da interface com PostgreSQL',async({page})=>{
  await page.getByRole('button',{name:'Salvar registro'}).click();
  await expect(page.getByRole('dialog')).toHaveCount(0);
  await expect(page.getByRole('cell',{name:'Loja navegador '+suffix,exact:true})).toBeVisible();
- await page.getByRole('link',{name:'Motos',exact:true}).click();
+ await page.getByRole('link',{name:'Motos',exact:true}).click();await page.getByRole('link',{name:'Motos avulsas',exact:true}).click();
  await page.getByRole('button',{name:'Cadastrar moto'}).click();
- for(const [label,value] of [['Marca','Marca E2E'],['Modelo','Moto '+suffix],['Ano','2026'],['Cor','Verde'],['Chassi / identificação','CHASSI_'+suffix],['Valor de venda (R$)','100.00']])await page.getByRole('dialog').getByLabel(label,{exact:false}).fill(value);
+ for(const [label,value] of [['Marca','Marca E2E'],['Modelo','Moto '+suffix],['Ano','2026'],['Cor','Verde'],['Link da foto','https://images.example.test/moto.png'],['Chassi / identificação','CHASSI_'+suffix],['Valor de venda (R$)','100.00']])await page.getByRole('dialog').getByLabel(label,{exact:false}).fill(value);
  await page.getByRole('dialog').getByLabel('Unidade',{exact:false}).selectOption({label:'Loja navegador '+suffix});
  await page.getByRole('button',{name:'Salvar registro'}).click();await expect(page.getByRole('dialog')).toHaveCount(0);
+ await expect(page.getByRole('img',{name:'Marca E2E Moto '+suffix})).toBeVisible();
+ await expect.poll(()=>page.getByRole('img',{name:'Marca E2E Moto '+suffix}).evaluate(img=>img.naturalWidth)).toBeGreaterThan(0);
  await page.getByRole('link',{name:'Clientes',exact:true}).click();
  await page.getByRole('button',{name:'Cadastrar cliente'}).click();
  // CPF reserved for the disposable E2E test database.
@@ -34,7 +43,7 @@ test('Fluxo completo da interface com PostgreSQL',async({page})=>{
  await page.getByLabel('Cliente',{exact:true}).selectOption({label:'Cliente navegador '+suffix+' · 11144477735'});
  const motoOption=await page.getByLabel('Moto disponível').locator('option').allTextContents();
  await page.getByLabel('Moto disponível').selectOption({label:motoOption.find(x=>x.includes('Moto '+suffix))});
- await page.getByLabel('Quantidade de parcelas').fill('3');
+ await page.getByLabel('Pagamento',{exact:true}).selectOption('parcelado');await page.getByLabel('Quantidade de parcelas').fill('3');
  await page.getByRole('button',{name:'Confirmar venda'}).click();await expect(page.getByRole('dialog')).toHaveCount(0);
  await page.getByRole('row').filter({hasText:'Cliente navegador '+suffix}).getByRole('link',{name:'Ver venda'}).click();
  await expect(page.getByText('R$ 33,34',{exact:true})).toBeVisible();
@@ -65,10 +74,11 @@ test('Fluxo completo da interface com PostgreSQL',async({page})=>{
 
 test('Funcionários, permissões, conta e logout pela interface',async({page})=>{
  test.skip(!process.env.E2E_PASSWORD,'Execute pelo script test:local -- --e2e.');
- const suffix=crypto.randomBytes(4).toString('hex'),email='manager-'+suffix+'@e2e.test',password=crypto.randomBytes(24).toString('base64url');
+ const suffix=crypto.randomBytes(4).toString('hex'),email='manager-'+suffix+'@e2e.test',password=crypto.randomBytes(24).toString('base64url')+'A!';
  await page.goto('/');
- await page.getByLabel('E-mail',{exact:true}).fill(process.env.E2E_EMAIL);await page.getByLabel('Senha',{exact:true}).fill(process.env.E2E_PASSWORD);
- await page.getByRole('button',{name:'Entrar no sistema'}).click();await expect(page.getByRole('heading',{name:'Olá, Equipe.'})).toBeVisible();
+ await page.getByLabel('E-mail ou nome de usuário',{exact:true}).fill(process.env.E2E_EMAIL);await page.getByLabel('Senha',{exact:true}).fill(process.env.E2E_PASSWORD);
+ await page.getByRole('button',{name:'Entrar no sistema'}).click();
+ await page.getByRole('button',{name:/Todas as unidades/}).click();await expect(page.getByRole('heading',{name:'Olá, Equipe.'})).toBeVisible();
  await page.getByRole('link',{name:'Funcionários',exact:true}).click();await page.getByRole('button',{name:'Cadastrar funcionário'}).click();
  const dialog=page.getByRole('dialog');
  await dialog.getByLabel('Nome completo').fill('Gerente navegador '+suffix);
@@ -83,12 +93,19 @@ test('Funcionários, permissões, conta e logout pela interface',async({page})=>
  await page.getByRole('dialog').getByLabel('Nome completo').fill('Gestor navegador '+suffix);
  await page.getByRole('dialog').getByRole('button',{name:'Salvar registro'}).click();await expect(dialog).toHaveCount(0);
  await page.getByRole('button',{name:'Sair',exact:true}).click();await expect(page.getByRole('heading',{name:'Bem-vindo de volta'})).toBeVisible();
- await page.getByLabel('E-mail',{exact:true}).fill(email);await page.getByLabel('Senha',{exact:true}).fill(password);
- await page.getByRole('button',{name:'Entrar no sistema'}).click();await expect(page.getByRole('heading',{name:'Olá, Gestor.'})).toBeVisible();
+ await page.getByLabel('E-mail ou nome de usuário',{exact:true}).fill(email);await page.getByLabel('Senha',{exact:true}).fill(password);
+ await page.getByRole('button',{name:'Entrar no sistema'}).click();
+ await page.getByLabel('Nova senha',{exact:true}).fill(password+'Novo!');await page.getByLabel('Confirmar nova senha',{exact:true}).fill(password+'Novo!');await page.getByRole('button',{name:'Salvar nova senha'}).click();
+ await expect(page.getByRole('button',{name:/Todas as unidades/})).toHaveCount(0);
+ await page.getByRole('button',{name:new RegExp(unit)}).click();await expect(page.getByRole('heading',{name:'Olá, Gestor.'})).toBeVisible();
+ await page.getByRole('link',{name:'Permissões',exact:true}).click();await expect(page.getByRole('heading',{name:'Permissões de acesso'})).toBeVisible();
  await expect(page.getByRole('link',{name:'Auditoria',exact:true})).toHaveCount(0);await expect(page.getByRole('link',{name:'Unidades',exact:true})).toHaveCount(0);
  await page.getByRole('link',{name:'Funcionários',exact:true}).click();await expect(page.getByRole('button',{name:'Cadastrar funcionário'})).toHaveCount(0);
  await page.getByRole('link',{name:'Minha conta',exact:true}).click();
  await page.getByLabel('Nome completo').fill('Gestor atualizado '+suffix);
+ await page.getByLabel('Nome de usuário',{exact:true}).fill('gestor.'+suffix);
  await page.getByRole('button',{name:'Salvar alterações'}).click();await expect(page.getByRole('status')).toHaveText('Conta atualizada.');
  await page.getByRole('button',{name:'Sair',exact:true}).click();await expect(page.getByRole('heading',{name:'Bem-vindo de volta'})).toBeVisible();
+ await page.screenshot({path:'.local/login-updated.png',fullPage:true});
+ await page.getByLabel('E-mail ou nome de usuário',{exact:true}).fill(('gestor.'+suffix).toUpperCase());await page.getByLabel('Senha',{exact:true}).fill(password+'Novo!');await page.getByRole('button',{name:'Entrar no sistema'}).click();await expect(page.getByRole('heading',{name:'Suas unidades',exact:true})).toBeVisible();await page.getByRole('button',{name:new RegExp(unit)}).click();await expect(page.getByRole('heading',{name:'Olá, Gestor.'})).toBeVisible();
 });

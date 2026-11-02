@@ -37,6 +37,8 @@ model Unit {
   updatedAt DateTime @updatedAt
   users User[]
   managers ManagerUnit[]
+  products Product[]
+  images StoredImage[]
   motorcycles Motorcycle[]
   sales Sale[]
   customers Customer[]
@@ -45,17 +47,21 @@ model User {
   id String @id @default(uuid())
   name String
   email String @unique
+  username String? @unique
   phone String @default("")
   passwordHash String
   role Role
   active Boolean @default(true)
   sessionVersion Int @default(0)
+  mustChangePassword Boolean @default(true)
   unitId String?
   unit Unit? @relation(fields: [unitId], references: [id], onDelete: Restrict)
   managerUnits ManagerUnit[]
   sales Sale[]
   customers Customer[]
   auditLogs AuditLog[]
+  stockMovements StockMovement[]
+  priceChanges PriceChange[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   @@index([unitId, role, active])
@@ -93,12 +99,109 @@ model Customer {
   @@index([unitId, name])
   @@index([createdById])
 }
+model Product {
+  id String @id @default(uuid())
+  name String
+  brand String
+  model String
+  description String @default("")
+  imageUrl String?
+  basePrice Decimal @db.Decimal(14,2)
+  colors String[] @default([])
+  batteryTypes String[] @default([])
+  versions String[] @default([])
+  active Boolean @default(true)
+  unitId String
+  unit Unit @relation(fields: [unitId], references: [id], onDelete: Restrict)
+  variants ProductVariant[]
+  priceChanges PriceChange[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@unique([unitId, name])
+  @@index([unitId, active])
+}
+model StoredImage {
+  id String @id @default(uuid())
+  unitId String
+  unit Unit @relation(fields: [unitId], references: [id], onDelete: Restrict)
+  hash String @db.Char(64)
+  data Bytes
+  width Int
+  height Int
+  size Int
+  createdAt DateTime @default(now())
+  @@unique([unitId, hash])
+}
+model ProductVariant {
+  id String @id @default(uuid())
+  productId String
+  product Product @relation(fields: [productId], references: [id], onDelete: Restrict)
+  version String
+  batteryType String
+  color String
+  colorSwatches Json @default("[]")
+  price Decimal? @db.Decimal(14,2)
+  imageUrl String?
+  active Boolean @default(true)
+  motorcycles Motorcycle[]
+  batches StockBatch[]
+  movements StockMovement[]
+  priceChanges PriceChange[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@unique([productId, version, batteryType, color])
+}
+model StockBatch {
+  id String @id @default(uuid())
+  variantId String
+  variant ProductVariant @relation(fields: [variantId], references: [id], onDelete: Restrict)
+  code String
+  quantity Int
+  unitCost Decimal? @db.Decimal(14,2)
+  notes String @default("")
+  motorcycles Motorcycle[]
+  createdAt DateTime @default(now())
+  @@index([variantId, createdAt])
+}
+model StockMovement {
+  id String @id @default(uuid())
+  variantId String
+  variant ProductVariant @relation(fields: [variantId], references: [id], onDelete: Restrict)
+  userId String?
+  user User? @relation(fields: [userId], references: [id], onDelete: Restrict)
+  saleId String?
+  sale Sale? @relation(fields: [saleId], references: [id], onDelete: Restrict)
+  kind String
+  quantity Int
+  reason String
+  createdAt DateTime @default(now())
+  @@index([variantId, createdAt])
+}
+model PriceChange {
+  id String @id @default(uuid())
+  productId String
+  product Product @relation(fields: [productId], references: [id], onDelete: Restrict)
+  variantId String?
+  variant ProductVariant? @relation(fields: [variantId], references: [id], onDelete: Restrict)
+  userId String?
+  user User? @relation(fields: [userId], references: [id], onDelete: Restrict)
+  oldPrice Decimal @db.Decimal(14,2)
+  newPrice Decimal @db.Decimal(14,2)
+  reason String
+  createdAt DateTime @default(now())
+  @@index([productId, createdAt])
+}
 model Motorcycle {
   id String @id @default(uuid())
   brand String
   model String
   year Int
   color String
+  imageUrl String?
+  variantId String?
+  variant ProductVariant? @relation(fields: [variantId], references: [id], onDelete: Restrict)
+  stockBatchId String?
+  stockBatch StockBatch? @relation(fields: [stockBatchId], references: [id], onDelete: Restrict)
   chassis String? @unique
   price Decimal @db.Decimal(14,2)
   unitId String
@@ -108,6 +211,8 @@ model Motorcycle {
   sales Sale[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  @@index([variantId, status])
+  @@index([stockBatchId])
   @@index([unitId, status])
 }
 model Sale {
@@ -122,10 +227,12 @@ model Sale {
   sellerId String
   seller User @relation(fields: [sellerId], references: [id], onDelete: Restrict)
   total Decimal @db.Decimal(14,2)
+  financing Json?
   soldAt DateTime @db.Date
   installmentCount Int
   status SaleStatus @default(ATIVA)
   cancellationReason String?
+  stockMovements StockMovement[]
   installments Installment[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

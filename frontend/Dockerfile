@@ -4,6 +4,7 @@ COPY package.json package-lock.json ./
 COPY frontend/package.json frontend/package.json
 COPY backend/package.json backend/package.json
 RUN npm ci --workspace frontend --include-workspace-root=false
+COPY shared shared
 COPY frontend frontend
 RUN npm run build --workspace frontend
 FROM nginx:stable-alpine

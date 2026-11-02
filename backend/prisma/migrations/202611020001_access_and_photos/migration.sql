@@ -1,0 +1,2 @@
+ALTER TABLE "User" ADD COLUMN "mustChangePassword" BOOLEAN NOT NULL DEFAULT true;
+ALTER TABLE "Motorcycle" ADD COLUMN "imageUrl" TEXT;

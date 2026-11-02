@@ -1,12 +1,12 @@
 import { db } from '../config/db.js';
 import { list,search,boolFilter,enumFilter } from '../lib/query.js';
-import { unitScope,unitIds,customerScope,saleScope,publicUser } from '../middlewares/security.js';
+import { unitScope,allowedUnitIds,customerScope,saleScope,publicUser } from '../middlewares/security.js';
 import { saveUnit,saveEmployee,saveCustomer,saveMotorcycle,scopedRecord } from '../services/records.js';
 import { audit } from '../services/audit.js';
 import { AppError,effectiveStatus } from '../lib/business.js';
 import bcrypt from 'bcrypt';
 export async function units(req,res) {
- const q=search(req.query.q),ids=unitIds(req.user);
+ const q=search(req.query.q),ids=allowedUnitIds(req.user);
  res.json(await list(db.unit,req,{...(ids===null?{}:{id:{in:ids}}),active:boolFilter(req.query.active),...(q?{OR:[{name:{contains:q,mode:'insensitive'}},{code:{contains:q,mode:'insensitive'}}]}:{})}));
 }
 export async function employees(req,res) {
@@ -20,7 +20,7 @@ export async function customers(req,res) {
 }
 export async function motorcycles(req,res) {
  const q=search(req.query.q);
- res.json(await list(db.motorcycle,req,{AND:[unitScope(req.user),{unitId:req.query.unitId||undefined,status:enumFilter(req.query.status,['DISPONIVEL','VENDIDA','INATIVA']),...(q?{OR:[{brand:{contains:q,mode:'insensitive'}},{model:{contains:q,mode:'insensitive'}}]}:{})}]},{unit:true}));
+ res.json(await list(db.motorcycle,req,{AND:[unitScope(req.user),{...(req.query.unassigned==='true'?{variantId:null}:{}),unitId:req.query.unitId||undefined,status:enumFilter(req.query.status,['DISPONIVEL','VENDIDA','INATIVA']),...(q?{OR:[{brand:{contains:q,mode:'insensitive'}},{model:{contains:q,mode:'insensitive'}}]}:{})}]},{unit:true}));
 }
 export async function customerDetail(req,res) {
  const customer=await scopedRecord(db,'customer',req.params.id,customerScope(req.user));
@@ -32,13 +32,17 @@ export async function motorcycleDetail(req,res) {
 }
 export const writeUnit=async(req,res)=>res.status(req.params.id?200:201).json({data:await saveUnit(req)});
 export const writeEmployee=async(req,res)=>res.status(req.params.id?200:201).json({data:await saveEmployee(req)});
+export async function quickCustomer(req,res){
+ req.body={...req.body,zip:'',street:'',number:'',complement:'',neighborhood:'',city:'',state:'',notes:'',active:true};
+ res.status(201).json({data:await saveCustomer(req)});
+}
 export const writeCustomer=async(req,res)=>res.status(req.params.id?200:201).json({data:await saveCustomer(req)});
 export const writeMotorcycle=async(req,res)=>res.status(req.params.id?200:201).json({data:await saveMotorcycle(req)});
 export async function reset(req,res) {
  const passwordHash=await bcrypt.hash(req.body.password,12);
  const user=await db.$transaction(async tx=>{
   const before=await scopedRecord(tx,'user',req.params.id);
-  const after=await tx.user.update({where:{id:before.id},data:{passwordHash,sessionVersion:{increment:1}}});
+  const after=await tx.user.update({where:{id:before.id},data:{passwordHash,mustChangePassword:true,sessionVersion:{increment:1}}});
   await audit(tx,req,'PASSWORD_RESET','User',before.id); return after;
  });
  res.json({data:publicUser(user)});

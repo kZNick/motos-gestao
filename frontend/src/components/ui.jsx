@@ -1,4 +1,4 @@
-import { useState,useEffect,useRef } from 'react';
+import { useState,useEffect,useRef,Children,isValidElement } from 'react';
 import { X,LoaderCircle,Search,ChevronLeft,ChevronRight,Inbox } from 'lucide-react';
 export const money=v=>new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(v);
 export const date=v=>v?new Intl.DateTimeFormat('pt-BR',{timeZone:'UTC'}).format(new Date(v)):'—';
@@ -8,10 +8,10 @@ export function Badge({value}) {return <span className={'badge b-'+String(value)
 export function Loading(){return <div className="state"><LoaderCircle className="spin" size={25}/> Carregando…</div>;}
 export function ErrorBox({error}){return error?<div role="alert" className="error">{error}</div>:null;}
 export function Empty({text='Nenhum registro encontrado.'}){return <div className="state empty"><Inbox size={30}/><strong>{text}</strong><span>Cadastre um registro ou ajuste os filtros.</span></div>;}
-export function Modal({title,children,onClose}) {
+export function Modal({title,children,onClose,className=''}) {
  const dialog=useRef(null),close=useRef(onClose);close.current=onClose;
  useEffect(()=>{const previous=document.activeElement;const before=document.body.style.overflow;document.body.style.overflow='hidden';dialog.current?.querySelector('button,input,select,textarea')?.focus();const key=e=>{if(e.key==='Escape')close.current();if(e.key==='Tab'){const nodes=Array.from(dialog.current.querySelectorAll('button,a,input,select,textarea')).filter(n=>!n.disabled&&n.offsetParent!==null);const first=nodes[0],last=nodes.at(-1);if(e.shiftKey&&document.activeElement===first){e.preventDefault();last?.focus();}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first?.focus();}}};document.addEventListener('keydown',key);return()=>{document.body.style.overflow=before;document.removeEventListener('keydown',key);previous?.focus();};},[]);
- return <div className="modal-backdrop" onMouseDown={e=>{if(e.target===e.currentTarget)onClose();}}><section ref={dialog} className="modal" role="dialog" aria-modal="true" aria-label={title}><header><h2>{title}</h2><button type="button" className="icon-button" aria-label="Fechar" onClick={onClose}><X/></button></header>{children}</section></div>;
+ return <div className="modal-backdrop" onMouseDown={e=>{if(e.target===e.currentTarget)onClose();}}><section ref={dialog} className={'modal '+className} role="dialog" aria-modal="true" aria-label={title}><header><h2>{title}</h2><button type="button" className="icon-button" aria-label="Fechar" onClick={onClose}><X/></button></header><div className="modal-content">{children}</div></section></div>;
 }
 export function Table({columns,rows,onRow,actions}) {
  if(!rows?.length)return <Empty/>;
@@ -21,5 +21,15 @@ export function Pagination({meta,page,setPage}) {return <div className="paginati
 export function SearchBox({value,onChange,placeholder='Pesquisar…'}) {return <div className="search"><Search size={17}/><input aria-label={placeholder} value={value} onChange={e=>onChange(e.target.value)} placeholder={placeholder}/></div>;}
 export function ConfirmForm({title,onSubmit,pending,error,reason=false,paid=false}) {
  const [note,setNote]=useState(''),[paidAt,setPaidAt]=useState(localDay());
- return <form onSubmit={e=>{e.preventDefault();onSubmit(paid?{paidAt,notes:note}:reason?{reason:note}:{});}}><p className="muted">{title}</p><ErrorBox error={error}/>{paid&&<label>Data efetiva de pagamento<input required type="date" value={paidAt} max={localDay()} onChange={e=>setPaidAt(e.target.value)}/></label>}{(reason||paid)&&<label>{reason?'Motivo':'Observações'}<textarea required={reason} minLength={reason?5:undefined} maxLength={2000} value={note} onChange={e=>setNote(e.target.value)}/></label>}<footer><button className="primary" disabled={pending}>{pending?'Salvando…':'Confirmar'}</button></footer></form>;
+ return <form onSubmit={e=>{e.preventDefault();onSubmit(paid?{paidAt,notes:note}:reason?{reason:note}:{});}}><div className="modal-form-fields"><p className="muted">{title}</p><ErrorBox error={error}/>{paid&&<label>Data efetiva de pagamento<input required type="date" value={paidAt} max={localDay()} onChange={e=>setPaidAt(e.target.value)}/></label>}{(reason||paid)&&<label>{reason?'Motivo':'Observações'}<textarea required={reason} minLength={reason?5:undefined} maxLength={2000} value={note} onChange={e=>setNote(e.target.value)}/></label>}</div><footer><button className="primary" disabled={pending}>{pending?'Salvando…':'Confirmar'}</button></footer></form>;
+}
+
+const filterLabels={'Filtrar units':'Unidade','Filtrar users':'Vendedor','Filtrar customers':'Cliente','Filtrar unidade':'Unidade','Filtrar cargo':'Cargo','Disponibilidade':'Disponibilidade','Status':'Status','Unidade do catálogo':'Unidade','Unidade do dashboard':'Unidade','Usuário responsável':'Responsável','Ação':'Ação','Entidade':'Entidade'};
+export function FilterBar({children,className='filters'}) {
+ return <div className={className+' filter-bar'}>{Children.toArray(children).map((child,index)=>{
+  if(!isValidElement(child))return child;
+  if(child.type===SearchBox)return <div className="filter-field filter-search" key={child.key||index}><span className="filter-caption">Busca</span>{child}</div>;
+  if(child.type==='select')return <label className="filter-field" key={child.key||index}><span className="filter-caption">{filterLabels[child.props['aria-label']]||child.props['aria-label']||'Filtro'}</span>{child}</label>;
+  return <div className="filter-field" key={child.key||index}>{child}</div>;
+ })}</div>;
 }

@@ -1,0 +1,7 @@
+import { useQuery } from '@tanstack/react-query';
+import { api,errorMessage } from '../api.js';
+import { Loading,ErrorBox } from '../components/ui.jsx';
+export function Access({user}) {
+ const query=useQuery({queryKey:['access'],queryFn:async()=>(await api.get('/access')).data.data});
+ return <><div className="page-heading"><div><h1>Permissões de acesso</h1><p>ACL padrão por perfil. Seu perfil: {user.role==='ADMIN'?'Administrador':user.role==='GERENTE'?'Gerente':'Vendedor'}.</p></div></div><ErrorBox error={query.isError?errorMessage(query.error):null}/>{query.isPending?<Loading/>:<div className="panel table-scroll"><table><thead><tr><th>Permissão</th><th>Administrador</th><th>Gerente</th><th>Vendedor</th></tr></thead><tbody>{query.data?.map(p=><tr key={p.key}><td>{p.label}</td>{['ADMIN','GERENTE','VENDEDOR'].map(role=><td key={role}>{p.roles.includes(role)?'Permitido':'Sem acesso'}</td>)}</tr>)}</tbody></table></div>}<div className="panel acl-notes"><h2>Limites por unidade</h2><p>Administrador: pode escolher qualquer unidade ou consultar todas. Gerente: somente unidades atribuídas e ativas. Vendedor: somente a unidade vinculada, seus clientes e suas vendas.</p><p>A seleção da unidade limita cadastros, estoque, vendas, parcelas e dashboard. As regras são verificadas no servidor em cada operação.</p><p>O administrador atribui cargos e unidades em Funcionários. Senhas iniciais ou redefinidas precisam ser trocadas no próximo acesso.</p></div></>;
+}

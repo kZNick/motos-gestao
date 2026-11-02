@@ -5,6 +5,7 @@ COPY package.json package-lock.json ./
 COPY backend/package.json backend/package.json
 COPY frontend/package.json frontend/package.json
 RUN npm ci --workspace backend --include-workspace-root=false
+COPY shared shared
 COPY backend backend
 RUN npm run db:generate --workspace backend
 USER node

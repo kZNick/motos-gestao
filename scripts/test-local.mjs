@@ -11,11 +11,14 @@ try{
  await run(createRequire(new URL('../backend/package.json',import.meta.url)).resolve('prisma/build/index.js'),['migrate','deploy','--schema','backend/prisma/schema.prisma']);
  await run('backend/tests/business.test.js',[]);
  await run('backend/tests/integration.test.js',[]);
+ await run('backend/tests/username.test.js',[]);
+ await run('backend/tests/images.test.js',[]);
  if(process.argv.includes('--e2e')){
   // Test credentials exist only in this process and in the disposable test database.
   const crypto=await import('node:crypto');
-  runtime.E2E_PASSWORD=crypto.randomBytes(24).toString('base64url');
+  runtime.E2E_PASSWORD=crypto.randomBytes(24).toString('base64url')+'A!';
   runtime.E2E_EMAIL='browser@e2e.test';
+  runtime.PORT='3002';runtime.APP_ORIGIN='http://localhost:5178';runtime.E2E_API_PORT='3002';runtime.E2E_WEB_PORT='5178';
   await run('scripts/e2e-bootstrap.mjs',[]);
   await run('node_modules/@playwright/test/cli.js',['test']);
  }

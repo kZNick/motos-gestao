@@ -6,7 +6,10 @@ export async function dashboard(req,res) {
  const scope={AND:[saleScope(req.user),{unitId:req.query.unitId||undefined}]};
  const salesScope={AND:[scope,{soldAt:period(req.query),status:'ATIVA'}]};
  const now=today(),soon=new Date(now);soon.setUTCDate(soon.getUTCDate()+7);
- const [saleCount,customerCount,availableCount,overdueCount,upcomingCount,recent,upcoming,overdue,groups,unitGroups,sellerGroups]=await Promise.all([
+ const [totals,receivables,overdueAmount,saleCount,customerCount,availableCount,overdueCount,upcomingCount,recent,upcoming,overdue,groups,unitGroups,sellerGroups]=await Promise.all([
+  db.sale.aggregate({where:salesScope,_sum:{total:true}}),
+  db.installment.aggregate({where:{sale:scope,status:'PENDENTE'},_sum:{amount:true}}),
+  db.installment.aggregate({where:{sale:scope,status:'PENDENTE',dueAt:{lt:now}},_sum:{amount:true}}),
   db.sale.count({where:salesScope}),
   db.customer.count({where:{AND:[customerScope(req.user),{unitId:req.query.unitId||undefined,createdAt:period(req.query),active:true}]}}),
   db.motorcycle.count({where:{AND:[unitScope(req.user),{unitId:req.query.unitId||undefined,status:'DISPONIVEL'}]}}),
@@ -22,7 +25,7 @@ export async function dashboard(req,res) {
  const months={};for(const g of groups){const key=g.soldAt.toISOString().slice(0,7);months[key]=(months[key]||0)+g._count;}
  const units=await db.unit.findMany({where:{id:{in:unitGroups.map(g=>g.unitId)}},select:{id:true,name:true}});
  const users=await db.user.findMany({where:{id:{in:sellerGroups.map(g=>g.sellerId)}},select:{id:true,name:true}});
- res.json({data:{saleCount,customerCount,availableCount,overdueCount,upcomingCount,recent,
+ res.json({data:{saleTotal:totals._sum.total||'0',receivableTotal:receivables._sum.amount||'0',overdueTotal:overdueAmount._sum.amount||'0',saleCount,customerCount,availableCount,overdueCount,upcomingCount,recent,
   upcoming:upcoming.map(i=>({...i,status:effectiveStatus(i)})),overdue:overdue.map(i=>({...i,status:effectiveStatus(i)})),
   months:Object.entries(months).map(([month,count])=>({month,count})),
   byUnit:unitGroups.map(g=>({name:units.find(u=>u.id===g.unitId)?.name,count:g._count})),

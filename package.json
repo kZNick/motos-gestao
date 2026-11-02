@@ -17,7 +17,8 @@
     "db:local": "node scripts/portable-postgres.mjs",
     "test:local": "node scripts/test-local.mjs",
     "setup": "node scripts/setup.mjs",
-    "test:config": "node scripts/test-config.mjs"
+    "test:config": "node scripts/test-config.mjs",
+    "demo:seed": "node backend/scripts/seed-demo.js"
   },
   "devDependencies": {
     "@playwright/test": "1.56.1",

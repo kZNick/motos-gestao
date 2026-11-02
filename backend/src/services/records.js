@@ -16,8 +16,6 @@ export async function saveUnit(req) {
  });
 }
 async function checkEmployee(tx,data) {
- if(data.role==='VENDEDOR'&&!data.unitId) throw new AppError(422,'Vendedor precisa de uma unidade.');
- if(data.role==='GERENTE'&&!data.managerUnitIds.length) throw new AppError(422,'Gerente precisa de pelo menos uma unidade.');
  const ids=[...new Set([...(data.unitId?[data.unitId]:[]),...data.managerUnitIds])];
  if(await tx.unit.count({where:{id:{in:ids},active:true}})!==ids.length) throw new AppError(422,'Selecione unidades ativas.');
 }
@@ -33,7 +31,7 @@ export async function saveEmployee(req) {
    if(await tx.user.count({where:{role:'ADMIN',active:true}})<=1) throw new AppError(409,'Mantenha pelo menos um administrador ativo.');
   }
   if(before?.id===req.user.id&&(data.role!=='ADMIN'||!data.active)) throw new AppError(409,'Você não pode remover seu próprio acesso administrativo.');
-  const write={...data,unitId:data.role==='VENDEDOR'?data.unitId:null,...(passwordHash?{passwordHash}:{})};
+  const write={...data,unitId:data.role==='VENDEDOR'?data.unitId:null,...(passwordHash?{passwordHash,mustChangePassword:true}:{})};
   const after=before?await tx.user.update({where:{id:before.id},data:{...write,sessionVersion:{increment:1},managerUnits:{deleteMany:{},create:data.role==='GERENTE'?managerUnitIds.map(unitId=>({unitId})):[]}},include:{managerUnits:true,unit:true}}):await tx.user.create({data:{...write,managerUnits:{create:data.role==='GERENTE'?managerUnitIds.map(unitId=>({unitId})):[]}},include:{managerUnits:true,unit:true}});
   await audit(tx,req,before?'UPDATE':'CREATE','User',after.id,before,after);
   return publicUser(after);
@@ -53,6 +51,7 @@ export async function saveMotorcycle(req) {
  return db.$transaction(async tx=>{
   const before=req.params.id?await scopedRecord(tx,'motorcycle',req.params.id,unitScope(req.user)):null;
   if(!await tx.unit.findFirst({where:{id:req.body.unitId,active:true}})) throw new AppError(422,'Unidade inativa.');
+  if(before?.variantId)throw new AppError(409,'Use o produto e a variação para alterar este estoque.');
   if(before && (before.status==='VENDIDA'||await tx.sale.count({where:{motorcycleId:before.id,status:'ATIVA'}}))) throw new AppError(409,'Moto com venda ativa não pode ser alterada.');
   let after;
   if(before) {
